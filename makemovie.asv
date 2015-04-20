@@ -95,10 +95,8 @@ function makemovie(filename, filemat, filebmp)
         
         %radiative loss to surroundings, q_rad = e*sig*(T^4-Tamb^4)
         Rad{i} = 0.95*5.67e-8*(FrameData{1,i}.^4-300^4);
-        
-        Heat{i} = Cond{i} + Rad{i};
     end
-    FrameData = [FrameData; Cond; Rad; Heat];
+    FrameData = [FrameData; Cond; Rad];
     clear Cond;
 
     %% find the max and min vals over the whole dataset
@@ -106,7 +104,7 @@ function makemovie(filename, filemat, filebmp)
     TLimHi = max(max(temps));
     TLimLo = min(min(temps));
 
-    heat = cell2mat(FrameData(6,:));
+    heat = cell2mat(FrameData(4,:));
     CLimHi = max(max(heat));
     CLimLo = min(min(heat));
 
@@ -124,8 +122,8 @@ function makemovie(filename, filemat, filebmp)
     set(gca,'CLim',[TLimLo TLimHi]);
     colormap(gca,'Jet')
 
-    subplot(1,2,2); %heat
-    hplot2 = surface(FrameData{6,1});
+    subplot(1,2,2); %conduction
+    hplot2 = surface(FrameData{4,1});
     shading flat;
     % set(gcf,'Renderer','zbuffer');
     % set(gca,'nextplot','replacechildren');
