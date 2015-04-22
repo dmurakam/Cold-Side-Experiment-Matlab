@@ -4,7 +4,7 @@
 
 %requires .mat and .bmp (box for ROI) files
 
-function makemovie(filename, filemat, filebmp)
+function FrameData = makemovie(filename, filemat, filebmp)
     %% load data and set ROI limits
     load(filemat);
 
@@ -88,10 +88,10 @@ function makemovie(filename, filemat, filebmp)
 %         Gmag = conv2(FrameData{1,i},L,'same');
 
 
-        FrameData{1,i} = FrameData{1,i}(1+n:end-n,1+n:end-n);
+        FrameData{1,i} = FrameData{1,i}(2+n:end-n-1,2+n:end-n-1);
         
         %conduction within the foil
-        Cond{i} = Gmag(3+n:end-n-2,3+n:end-n-2);     
+        Cond{i} = Gmag(2+n:end-n-1,2+n:end-n-1);     
         
         %radiative loss to surroundings, q_rad = e*sig*(T^4-Tamb^4)
         Rad{i} = 0.95*5.67e-8*(FrameData{1,i}.^4-300^4);
