@@ -4,7 +4,7 @@
 
 %requires .mat and .bmp (box for ROI) files
 
-function FrameData = makemovie(filename, filemat, filebmp)
+function FrameData = makemovie(filename, filemat, filebmp, dx)
     %% load data and set ROI limits
     load(filemat);
 
@@ -15,10 +15,6 @@ function FrameData = makemovie(filename, filemat, filebmp)
 
     kc = 16.3; %thermal conductivity of SS304 at 23C [W/m-K]
     th = 2.54e-5; %thickness of foil [m]
-    
-    dx = 0.011938/50; %one pixel is this many meters [px/m]
-    % inside distance between the two electrodes is 0.47 inches.
-    
     
     %ROI limits to crop to
     ROI = rgb2gray(importdata(filebmp)); 
@@ -87,14 +83,15 @@ function FrameData = makemovie(filename, filemat, filebmp)
 %         Gmag = diff(FrameData{1,i},2);
 %         Gmag = conv2(FrameData{1,i},L,'same');
 
-
+        %crop off the edges where the filter produces wonky data
         FrameData{1,i} = FrameData{1,i}(2+n:end-n-1,2+n:end-n-1);
         
         %conduction within the foil
-        Cond{i} = Gmag(2+n:end-n-1,2+n:end-n-1);     
+        %conduction in [W/m^2] times area (dx*th)
+        Cond{i} = Gmag(2+n:end-n-1,2+n:end-n-1) .* dx*th;     
         
         %radiative loss to surroundings, q_rad = e*sig*(T^4-Tamb^4)
-        Rad{i} = 0.95*5.67e-8*(FrameData{1,i}.^4-300^4);
+        Rad{i} = -0.95*5.67e-8*(FrameData{1,i}.^4-300^4) * dx^2;
         
         Heat{i} = Cond{i} + Rad{i};
     end
@@ -117,7 +114,7 @@ function FrameData = makemovie(filename, filemat, filebmp)
     figure('Position',[100 100 900 480]);
 
     subplot(1,2,1); %temperatures
-    hplot1 = mesh(FrameData{1,1});
+    hplot1 = surface(FrameData{1,1});
     % set(gcf,'Renderer','zbuffer');
     % set(gca,'nextplot','replacechildren');
     set(gca,'Zlim',[TLimLo TLimHi]);

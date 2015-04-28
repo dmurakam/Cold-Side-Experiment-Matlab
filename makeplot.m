@@ -2,7 +2,7 @@ function makeplot(hObject,event,Data,Timestamp,hplot,htxt1,htxt2)
 n = get(hObject,'Value');
 n = ceil(n);
 
-if n == 0; %remap from 1 to end, not zero
+if n == 0; %slider bar remaps from 1 to end, excludes zero
     n = 1;
 end
 
