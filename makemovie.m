@@ -8,7 +8,7 @@ function FrameData = makemovie(filename, filemat, filebmp, dx)
     %% load data and set ROI limits
     load(filemat);
 
-    n = 3; % related to stencil size i.e. -n:n points
+    n = 4; % related to stencil size i.e. -n:n points
     m = 2; % order of interpolation
     
     FtoCconv = true; %convert data from F to K
@@ -36,10 +36,10 @@ function FrameData = makemovie(filename, filemat, filebmp, dx)
 
     %% collapse all the data into a single cell array
     for i = 1:frame_max
-        cmdline = ['FrameData{1,i} = Frame' num2str(i) '(' ROIy ',' ROIx ');'];
+        cmdline = ['FrameData.T{i} = Frame' num2str(i) '(' ROIy ',' ROIx ');'];
         eval(cmdline);
 
-        cmdline = ['FrameData{2,i} = Frame' num2str(i) '_DateTime;'];
+        cmdline = ['FrameData.Time{i} = Frame' num2str(i) '_DateTime;'];
         eval(cmdline);
 
         %clean up source data
@@ -51,19 +51,19 @@ function FrameData = makemovie(filename, filemat, filebmp, dx)
     end
 
     for i = 1:frame_max
-        htxt2str = num2str(FrameData{2,i}(4:7));
+        htxt2str = num2str(FrameData.Time{i}(4:7));
         htxt2str = regexprep(htxt2str,'\s+',':');
 
         timestamplist{i} = htxt2str;
         
         %convert from F to K
         if FtoCconv == true
-            FrameData{1,i} = (FrameData{1,i} +459.67)*5/9;
+            FrameData.T{i} = (FrameData.T{i} +459.67)*5/9;
         end
         
     end
     
-    FrameData = [FrameData; timestamplist];
+    FrameData.TimeStampList = timestamplist;
 
     %% apply filter, do conduction calculations
     
@@ -78,34 +78,33 @@ function FrameData = makemovie(filename, filemat, filebmp, dx)
 %     L = fspecial('laplacian',0);
     
     for i = 1:frame_max
-        FrameData{1,i} = filter2(H,FrameData{1,i});
-        Gmag = 4*del2(FrameData{1,i},dx) *th*kc;
+        FrameData.T{i} = filter2(H,FrameData.T{i});
+        Gmag = 4*del2(FrameData.T{i},dx);
 %         Gmag = diff(FrameData{1,i},2);
 %         Gmag = conv2(FrameData{1,i},L,'same');
 
         %crop off the edges where the filter produces wonky data
-        FrameData{1,i} = FrameData{1,i}(2+n:end-n-1,2+n:end-n-1);
+        FrameData.T{i} = FrameData.T{i}(2+n:end-n-1,2+n:end-n-1);
         
         %conduction within the foil
-        %conduction in [W/m^2] times area (dx*th)
-        Cond{i} = Gmag(2+n:end-n-1,2+n:end-n-1) .* dx*th;     
+        %conduction in [W/m^2] times cross sectional area (dx*th) divide
+        %by surface normal area
+        FrameData.Cond{i} = Gmag(2+n:end-n-1,2+n:end-n-1)*kc*th;     
         
         %radiative loss to surroundings, q_rad = e*sig*(T^4-Tamb^4)
-        Rad{i} = -0.95*5.67e-8*(FrameData{1,i}.^4-300^4) * dx^2;
+        FrameData.Rad{i} = -0.95*5.67e-8*(FrameData.T{i}.^4-300^4);
         
-        Heat{i} = Cond{i} + Rad{i};
+        FrameData.Heat{i} = FrameData.Cond{i} + FrameData.Rad{i};
     end
-    FrameData = [FrameData; Cond; Rad; Heat];
-    clear Cond;
 
     %% find the max and min vals over the whole dataset
-    temps = cell2mat(FrameData(1,:));
-    TLimHi = max(max(temps));
-    TLimLo = min(min(temps));
+    temp = cell2mat(FrameData.T(:));
+    TLimHi = max(max(temp));
+    TLimLo = min(min(temp));
 
-    heat = cell2mat(FrameData(6,:));
-    CLimHi = max(max(heat));
-    CLimLo = min(min(heat));
+    temp = cell2mat(FrameData.Heat(:));
+    CLimHi = max(max(temp));
+    CLimLo = min(min(temp));
 
     clear temps;
     clear heat;
@@ -114,18 +113,20 @@ function FrameData = makemovie(filename, filemat, filebmp, dx)
     figure('Position',[100 100 900 480]);
 
     subplot(1,2,1); %temperatures
-    hplot1 = surface(FrameData{1,1});
+    hplot1 = surface(FrameData.T{1});
     % set(gcf,'Renderer','zbuffer');
     % set(gca,'nextplot','replacechildren');
     set(gca,'Zlim',[TLimLo TLimHi]);
     set(gca,'CLim',[TLimLo TLimHi]);
     colormap(gca,'Jet')
+    title('Temperatures');
 
     subplot(1,2,2); %heat
-    hplot2 = surface(FrameData{6,1});
+    hplot2 = surface(FrameData.Cond{1});
     shading flat;
     % set(gcf,'Renderer','zbuffer');
     % set(gca,'nextplot','replacechildren');
+    title('Conduction');
 
 
     set(gca,'Zlim',[CLimLo CLimHi]);
@@ -135,14 +136,14 @@ function FrameData = makemovie(filename, filemat, filebmp, dx)
     %timestamp string
     annotation('textbox',[0.02 0.9 0.1 0.1],'EdgeColor','none','String',[filename ' n-' num2str(n) ' m-' num2str(m)],'interpreter','none');   
     htxt1 = annotation('textbox',[0.9 0.9 0.1 0.1],'EdgeColor','none','String',{['Frame ' num2str(1)]});
-    htxt2 = annotation('textbox',[0.02 0.87 0.1 0.1],'EdgeColor','none','String',{['Time ' timestamplist{1}]});
+    htxt2 = annotation('textbox',[0.02 0.87 0.1 0.1],'EdgeColor','none','String',{['Time ' FrameData.TimeStampList{1}]});
 
     %% run update depending on slider position
 
     %ui slider control
     h = uicontrol('style','slider','units','normalized','min',0,'max',frame_max,...
         'sliderstep',[slide_stepsize slide_stepsize],'position',[0.05 0.01 0.90 0.05]);
-    addlistener(h,'ContinuousValueChange',@(hObject, event) makeplot(hObject,event,FrameData(1,:),timestamplist,hplot1,htxt1,htxt2));
-    addlistener(h,'ContinuousValueChange',@(hObject, event) makeplot(hObject,event,FrameData(4,:),timestamplist,hplot2,htxt1,htxt2));
+    addlistener(h,'ContinuousValueChange',@(hObject, event) makeplot(hObject,event,FrameData.T,FrameData.TimeStampList,hplot1,htxt1,htxt2));
+    addlistener(h,'ContinuousValueChange',@(hObject, event) makeplot(hObject,event,FrameData.Cond,FrameData.TimeStampList,hplot2,htxt1,htxt2));
 
 end
